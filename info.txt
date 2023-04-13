@@ -1,0 +1,123 @@
+FTP hostname linux396.unoeuro.com
+FTP port 21 (TLS possible)
+FTP username eventmedical.dk
+FTP password bwfhe5xyd4
+Folder for web files /intranet/
+
+Brugernavn: eventmedi
+Adgangskode: HvidRugmar1975
+https://event-medical.dk:2083/
+
+
+no-reply@event-medical.dk
+a8Tyjge3At^g
+
+UnBlock Ip
+https://www.simply.com/dk/rbl/
+
+
+https://nominatim.openstreetmap.org/search?q=1b+vamdrupvej,+r%C3%B8dovre&format=json&polygon=1&addressdetails=1
+
+
+I want us to stop using the external reasources and have them in house
+
+schedule admin 
+
+1. if no user and no applied on shift then bginfo if there is applied the purple collor , agr staff to to jo status ka color ho whe nonay cheya 
+2. schek icon size descrip
+3. tolltip font size
+
+over view page sam ecolor secion and transaltion 
+dashbaord py jo application  hain whn confirm ka lia optin 
+
+pwa
+new ka button ka ccolor primrayr blue ka jaga 
+dashboar new page same 
+no new s read no hon wo show karwani hain agr new  na ahgo to section he n shw karna hy 
+pri doc main sy remov karna hy Dokumenter remo hr 
+docmeny ka sort karna hy abc sy 
+remov Favoritter Dokumenter with gr
+heart to start
+pri document to list Oversigt
+pri view page jo status hy wo menu ky uper ana cheya or agr ek bar status kar diuan to show ni howny chea 
+pri detail status 
+	Update = Har du forstået instruksen ?
+	Choose = Du skal angive om indholdet af instruksen er forstået eller om du er i tvivl om indholdet.
+
+Pri detail tab = Kort version
+DOKUMENT ID-NR.: PRI.03.02.001 title to jag to readt status 
+pri doc main firts tab main search show kani hy next ma ni 
+pri detail py jo book mark icon haom wo menu ka icon kia jaga or start icon
+downlaod to outside box same like status
+Download = Download PRI-dokument
+pri view doc py secon tab name Bilag and last toi this Andre = Info
+
+new view page groups issue 
+lorem to whit bg with shadwo also icon color wo uper color
+
+profile page jo teme hy or company detail page st 3 box name email address
+
+https://intranet.eventmedical.dk/pwa/schedule/view/354
+same vehic same ni show ho rahe or agr accept ni hy tab bi show ho rah hy 
+pwa dashbard to Vis alle = Vis vagtplan same for bottom 
+
+
+if parent category is delete then sub category becomae a parent catergory
+
+
+-- scheduel main avaiblty mian righ click add ka lia then curst cop y past 
+-- tolltip font size
+-- document ka lia user setting main option dena hy to show to there group or all
+-- status bar py same color dena hy 
+
+--Dark mode icons PWA
+--Schedule sorted by month ka separator add karna hy 
+--https://codepen.io/Moiety/embed/eYarPq?default-tab=result&theme-id=dark
+
+
+
+
+
+
+https://play.google.com/console/u/0/developers/5424049299539250156/app-list?onboardingflow=signup
+
+
+
+User group in staff scheduke
+https://filamentphp.com/tricks/render-html-in-select-options
+
+
+
+
+Hour report page
+1. From Date
+2. To Date
+3. User TYpe Staff or Customer
+   agr staff ho to all staff or customer ho to custoemr or whn sy all ya single select kar sakta hy 
+
+jab single staff select ho to collapge ni dalna agr all ho to dalana hy 
+jab search ho jy to result collaps main ana cheya 
+header main name or right py total hours
+1. date 
+2. start time
+3. end time
+4. total hours
+5. assignments
+
+
+My Calender
+1. all monday day with my schedule and open schedule.
+2. apply button on open shift.
+3. phir jab admin schedule sy is shify ko open kary ga to whn 4th tab add karna hy apply ka or us main jo bi phly apply kary ga wo show karna hy 
+4. or schedule note icon ky bd icon add karna hy user-check ka or whn jab hovr kary to jtny bi user apply kia ho wo show karna hy 
+5. notification and user icon move o gy hy top py 
+
+
+1. Vinter2021!
+2. Mark Zweidorff
+3. What this meens?
+4. Event Medical Services ApS
+5. Lille Skensved
+6. Zealand
+7. Denmark
+8. +45

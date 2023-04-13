@@ -1,0 +1,15 @@
+{
+  "background_color": "#ff3b30",
+  "description": "Event Medical Services - Personale intranet",
+  "display": "fullscreen",
+  "icons": [
+    {
+      "src": "pwa.png",
+      "sizes": "200x200",
+      "type": "image/png"
+    }
+  ],
+  "name": "EMS - INTRANET",
+  "short_name": "EMS IntraNet",
+  "start_url": "/pwa"
+}

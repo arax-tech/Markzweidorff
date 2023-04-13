@@ -1,0 +1,1939 @@
+@extends('user.layouts.app')
+@section('title', 'Schedule')
+@section('css')
+<style type="text/css">
+    .img-fluid{max-width: 260% !important;}
+    a{text-decoration: none !important;}
+    /*.myBell{font-size: 500px !important}*/
+    .btn-transparent-dark{border-radius: 50% !important}
+    .btn-transparent-dark::before{display: none !important}
+    .input{padding: 0.7rem 1.125rem !important;}
+    .nav-pills .nav-link{color: #31353d !important; border-radius: 0px !important;
+        padding: 5px !important;
+        margin: 5px !important; margin-bottom: -5px !important;}
+    .nav-pills .nav-link.active, .nav-pills .show > .nav-link{
+        color: #f53b57 !important;
+        border-bottom: 3px solid #f53b57 !important;
+        background: #f2f6fc !important;
+        outline: none !important;
+        border-radius: 0px !important;
+        padding: 5px !important;
+        margin: 5px !important;
+    }
+    .nav-item{margin-bottom: -5px !important; margin-left: 13px !important; margin-top: -17px !important}
+    .form-check-label{cursor: pointer;}
+    .font-weight-bolder{font-weight: bolder !important;}
+    .modal-dialog .modal-content .modal-header{border-bottom: none !important;}
+    .tata .tata-text{color: #fff !important}
+    .grid-wrapper > .grid-header{top: 135px !important}
+    .grid-wrapper > .grid .grid-row .cell:first-child .title{
+        color: #212832 !important;
+        font-size: 0.9rem !important;
+    }
+    .grid-wrapper > .grid-header .cell .title{
+        color: #212832 !important;
+        font-size: 0.9rem !important;
+    }
+    .schedule-item .heading .title{
+        color: #212832 !important;
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+    }
+    .grid-wrapper .cell .totals, .grid-wrapper .cell .timesheets-delta{
+        font-size: 0.9rem !important;
+
+    }
+    .schedule-item.shift .heading, .schedule-item.shift .details, .schedule-item.shift .break-details{
+        font-size: 0.9rem !important;
+
+    }
+    .input-group-text{
+        border-radius: 5px 0px 0px 5px !important;
+    }
+
+
+    .grid-row:hover{
+        /*border: 1px solid #f53b57 !important;*/
+        background: #f8fafc !important;
+        transition: 0.5 ease;
+    }
+    .schedule-item:first-child{
+        margin: 0.2rem 0.2em 0.2em !important;
+    }
+</style>
+<link rel="stylesheet" type="text/css" href="{{ asset('/backend/css/schedule.css') }}">
+
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+
+
+@endsection
+@php
+    
+    error_reporting(0);
+
+    
+    $array = auth::user()->permissions;
+    $permission = explode(",", $array);
+
+    use Carbon\Carbon;
+
+    $week = '';
+    $year = '';
+    $thisWeek = '';
+    // dd(request()->week);
+    if (request()->week)
+    {
+        $weekNumber = explode("-W", request()->week);
+        $thisWeek = request()->week;
+        $year = $weekNumber[0];
+        $week = $weekNumber[1];
+    }
+
+
+    
+    $AllUser = DB::table('users')->orderBy('name', 'ASC')->get();        
+    $AllCustomers = DB::table('customers')->orderBy('name', 'ASC')->get();
+
+    if(request()->active == "Customer"){
+        $scheduleUser = DB::table('customers')->orderBy('name', 'ASC')->get();
+    }else{
+        $scheduleUser = DB::table('users')->orderBy('name', 'ASC')->get();        
+    }
+
+        
+    function daysInWeek($weekNum)
+    {
+        $result = array();
+        $datetime = new DateTime('00:00:00');
+        $datetime->setISODate((int)$datetime->format('o'), $weekNum, 1);
+        $interval = new DateInterval('P1D');
+        $week = new DatePeriod($datetime, $interval, 6);
+
+        foreach($week as $day){
+            $result[] = $day->format('D-|-M-|-Y-|-d-|-m-|-l-|-j');
+        }
+        return $result;
+    }
+
+
+
+
+    $dateTime = new DateTime();
+    $dateTime->setISODate($year, $week);
+    $weekRange['start_date'] = $dateTime->format('Y-m-d');
+    $dateTime->modify('+6 days');
+    $weekRange['end_date'] = $dateTime->format('Y-m-d');
+
+
+    $schedulesPending = DB::table('schedules')->where(['status' => 'Pending'])->whereBetween('date', $weekRange)->count();
+    $schedulesAccepted = DB::table('schedules')->where(['status' => 'Accepted'])->whereBetween('date', $weekRange)->count();
+    $schedulesDeclined = DB::table('schedules')->where(['status' => 'Declined'])->whereBetween('date', $weekRange)->count();
+    $schedulesNotPublished = DB::table('schedules')->where(['visibility' => 'NotPublished'])->whereBetween('date', $weekRange)->count();
+    $AllschedulesNotPublished = DB::table('schedules')->where(['visibility' => 'NotPublished'])->whereBetween('date', $weekRange)->get();
+    $schedulesPublished = DB::table('schedules')->where(['visibility' => 'Published'])->whereBetween('date', $weekRange)->count();
+
+    $total_weekly_hours = DB::table('schedules')->whereBetween('date', $weekRange)->sum('total_hours');
+    $total_weekly_hours_amount = DB::table('schedules')->whereBetween('date', $weekRange)->sum('total_hourly_wags');
+
+
+    // dd($thisWeek);
+
+@endphp
+
+
+@section('content')
+@section('content')
+<header id="leftMargin" class="page-header page-header-compact page-header-light border-bottom bg-white mb-4 w-100 fixed-top" style="@if (auth::user()->sidebar == "Show") padding: 0px 20px 0px 260px ; @else padding: 0px 20px 0px 20px; @endif top: 58px ;">
+    
+    <div class="page-controls d-flex align-items-center justify-content-between">
+        <div class="left-controls">
+            
+            <div class="page-filters mb-2 mt-2" >
+            
+
+                
+                <div class="filter-scopes my-2">
+                    
+
+                    <a data-toggle="tooltip" title="Declined" class="scope shift-confirmed bg-danger text-white" href="#"><i data-feather="x-circle" style="margin-top: 2px"></i>
+                        <span class="count">{{ $schedulesDeclined }}</span>
+                    </a>
+                    
+                    <a data-toggle="tooltip" title="Pending" class="scope bg-warning text-white" href="#">
+                        <i data-feather="alert-octagon" style="margin-top: 2px"></i>
+                        <span class="count">{{ $schedulesPending }}</span>
+                    </a>
+
+                    <a data-toggle="tooltip" title="Accepted" class="scope bg-success text-white" href="#">
+                        <i data-feather="check" style="margin-top: 2px"></i>
+                        <span class="count">{{ $schedulesAccepted }}</span>
+                    </a>
+
+                  
+
+                </div>
+
+                
+
+            </div>
+        </div>
+
+        <div style="margin-right: -200px !important">
+            <div class="date-range-picker btn-group">
+                <a class="angle-left btn btn-default" href="javascript:void(0);">
+                    <i data-feather="chevron-left" style="margin-top: 4px;"></i>
+                    
+                </a>
+
+                <a class="picker btn btn-default"  href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#DatePicker">
+                    <i data-feather="calendar" style="margin-top: 4px;"></i>
+
+                    @foreach (daysInWeek($week) as $key => $value)
+                        @php
+                            error_reporting(0);
+                            $AllArray = explode("-|-", $value);
+                        @endphp
+
+
+                        <span data-target="layouts--date-range-picker.pickerText">
+                            @if ($key == 0) {{ $AllArray[6] }}. @if ($AllArray[1] == "Jan") Januar @elseif($AllArray[1] == "Feb") Februar @elseif($AllArray[1] == "Mar") Marts @elseif($AllArray[1] == "Apr") April @elseif($AllArray[1] == "May") Maj @elseif($AllArray[1] == "Jun") Juni @elseif($AllArray[1] == "Jul") Juli @elseif($AllArray[1] == "Aug") August @elseif($AllArray[1] == "Sep") September @elseif($AllArray[1] == "Oct") Oktober @elseif($AllArray[1] == "Nov") November @elseif($AllArray[1] == "Dec") December    @endif @endif
+                            <span style="margin-right: -2.5px">@if ($key==0)-@endif</span>
+                            @if($key == 6){{ $AllArray[3] }}. @if ($AllArray[1] == "Jan") Januar @elseif($AllArray[1] == "Feb") Februar @elseif($AllArray[1] == "Mar") Marts @elseif($AllArray[1] == "Apr") April @elseif($AllArray[1] == "May") Maj @elseif($AllArray[1] == "Jun") Juni @elseif($AllArray[1] == "Jul") Juli @elseif($AllArray[1] == "Aug") August @elseif($AllArray[1] == "Sep") September @elseif($AllArray[1] == "Oct") Oktober @elseif($AllArray[1] == "Nov") November @elseif($AllArray[1] == "Dec") December    @endif {{ $AllArray[2] }} @endif
+                        </span>
+                    @endforeach
+
+
+                </a>
+
+                <div class="dropdown">
+                    <a data-toggle="dropdown" data-target="#" class="btn btn-default" href="javascript:void(0);" style="padding-right: 26px !important;">Week </a>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-menu-inner">
+                            <a href="{{ url('/schedule?week='.$thisWeek.'&active='.request()->active) }}">Week</a>
+                        </div>
+                    </div>
+                </div>
+
+                <a class="angle-right btn btn-default" href="javascript:void(0);">
+                    <i data-feather="chevron-right" style="margin-top: 4px;"></i>
+                </a>
+            </div>
+        </div>
+
+
+        <div class="d-flex flex-row">
+
+
+            <div class="page-filters mb-2 mt-2" >
+                <div class="filter-collections filter-collection-override">
+                    <div class="filter-collections shift-filters" style="flex-wrap: wrap;max-width: 38%;overflow:unset">
+                    </div>
+
+
+
+
+                </div>
+
+
+                
+                <div class="filter-scopes my-2">
+                    
+
+                   
+
+                    <a data-toggle="tooltip" title="Not Published" class="scope" style="background-image: repeating-linear-gradient(-45deg, white, white 5px, #eff4f8 5px, #eff4f8 10px) !important;" href="#">
+                        <i data-feather="minus-circle" style="margin-top: 2px"></i>
+                        <span class="count">{{ $schedulesNotPublished }}</span>
+                    </a>
+
+                    <a data-toggle="tooltip" title="Published" class="scope" style="background: #f2f2f2 !important; color: #31353d !important" href="#">
+                        <i data-feather="check-circle" style="margin-top: 2px"></i>
+                        <span class="count">{{ $schedulesPublished }}</span>
+                    </a>
+
+                    
+
+                    
+
+                    
+                    <a class="btn btn-green" style="margin-left: 40px !important; padding-bottom: 3px !important" href="javascript::" data-bs-toggle="modal" data-bs-target="#PublishAll">
+                        <i data-feather="check" style="margin-top: 4px"></i>
+                        Publish
+                    </a>
+
+                </div>
+
+                
+
+            </div>
+
+            
+
+
+            
+        </div>
+    </div>
+    
+
+</header>
+<br><br>
+
+<!-- Main page content-->
+
+<div class="container-fluid text m-auto p-4">
+
+    <div class="modal fade" id="DatePicker">
+        <div class="modal-dialog ">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title d-flex align-items-center justify-content-center"><i class="me-1" data-feather="calendar"></i> Select Week</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    
+                    <form action="{{ url('/schedule?week='.$thisWeek.'&active='.request()->active) }}">
+                        <input type="week" name="week" value="{{ $thisWeek }}" class="form-control" onchange="this.form.submit()">
+                        <input type="hidden" name="active" value="{{ request()->active }}" class="form-control">
+                    </form>
+                </div>
+                <div class="card-footer bg-light">
+                    <button class="btn btn-sm" type="button" style="background-color: #8A8A8A; color: #fff;" data-bs-dismiss="modal" aria-label="Close">Annuller</button> 
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    {{-- <div class="page-controls d-flex align-items-center justify-content-between">
+        <div class="left-controls">
+            <div class="variation-type-menu">
+                <a class="{{ request()->active == "Customer" ? "active" : "" }}" href="{{ url('/schedule?week='.$thisWeek.'&active=Customer') }}">Customer</a>
+                <a class="{{ request()->active == "Staff" ? "active" : "" }}" href="{{ url('/schedule?week='.$thisWeek.'&active=Staff') }}">Staff</a>
+            </div>
+        </div>
+
+        <div class="">
+            <div class="date-range-picker btn-group">
+                <a class="angle-left btn btn-default" href="javascript:void(0);">
+                    <i data-feather="chevron-left" style="margin-top: 4px;"></i>
+                    
+                </a>
+
+                <a class="picker btn btn-default"  href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#DatePicker">
+                    <i data-feather="calendar" style="margin-top: 4px;"></i>
+
+                    @foreach (daysInWeek($week) as $key => $value)
+                        @php
+                            error_reporting(0);
+                            $AllArray = explode("-|-", $value);
+                        @endphp
+
+
+                        <span data-target="layouts--date-range-picker.pickerText">
+                            @if ($key == 0) {{ $AllArray[3] }}. @if ($AllArray[1] == "Jan") Januar @elseif($AllArray[1] == "Feb") Februar @elseif($AllArray[1] == "Mar") Marts @elseif($AllArray[1] == "Apr") April @elseif($AllArray[1] == "May") Maj @elseif($AllArray[1] == "Jun") Juni @elseif($AllArray[1] == "Jul") Juli @elseif($AllArray[1] == "Aug") August @elseif($AllArray[1] == "Sep") September @elseif($AllArray[1] == "Oct") Oktober @elseif($AllArray[1] == "Nov") November @elseif($AllArray[1] == "Dec") December    @endif @endif
+                            <span style="margin-right: -2.5px">@if ($key==0)-@endif</span>
+                            @if($key == 6){{ $AllArray[3] }}. @if ($AllArray[1] == "Jan") Januar @elseif($AllArray[1] == "Feb") Februar @elseif($AllArray[1] == "Mar") Marts @elseif($AllArray[1] == "Apr") April @elseif($AllArray[1] == "May") Maj @elseif($AllArray[1] == "Jun") Juni @elseif($AllArray[1] == "Jul") Juli @elseif($AllArray[1] == "Aug") August @elseif($AllArray[1] == "Sep") September @elseif($AllArray[1] == "Oct") Oktober @elseif($AllArray[1] == "Nov") November @elseif($AllArray[1] == "Dec") December    @endif {{ $AllArray[2] }} @endif
+                        </span>
+                    @endforeach
+
+
+                </a>
+
+                <div class="dropdown">
+                    <a data-toggle="dropdown" data-target="#" class="btn btn-default" href="javascript:void(0);" style="padding-right: 26px !important;">Week </a>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-menu-inner">
+                            <a href="{{ url('/schedule?week='.$thisWeek.'&active='.request()->active) }}">Week</a>
+                        </div>
+                    </div>
+                </div>
+
+                <a class="angle-right btn btn-default" href="javascript:void(0);">
+                    <i data-feather="chevron-right" style="margin-top: 4px;"></i>
+                </a>
+            </div>
+        </div>
+
+
+        <div class="">
+
+            <a class="btn btn-green" href="javascript::" data-bs-toggle="modal" data-bs-target="#PublishAll">
+                <i data-feather="check" style="margin-top: 4px;"></i>
+                Publish
+            </a>
+
+
+            
+        </div>
+    </div> --}}
+    <div class="modal fade" id="PublishAll">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="post" action="{{ url('/schedule/publish/shifts') }}">
+                    @csrf
+
+                    
+                    <div class="modal-header bg-light">
+                        <h5 class="modal-title d-flex align-items-center justify-content-center"><i class="me-1" data-feather="calendar"></i> Publish Shifts</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        
+                        
+                        <div class="row gx-3 mb-3">
+                            @foreach (daysInWeek($week) as $key => $value9)
+                                @php
+                                    error_reporting(0);
+                                    $AllArray9 = explode("-|-", $value9);
+                                @endphp
+
+                                @if ($key == 0) 
+                                    <div class="col-md-6">
+                                        <label class="small mb-1">Start Date </label>
+                                        <input type="date" class="form-control input" name="start_date" id="start_date" required value="{{ $AllArray9[2]."-".$AllArray9[4]."-".$AllArray9[3] }}">
+                                    </div>
+                                @endif
+
+
+                                @if($key == 6)
+                                    <div class="col-md-6">
+                                        <label class="small mb-1">End Date </label>
+                                        <input type="date" class="form-control input" name="end_date" id="end_date" required value="{{ $AllArray9[2]."-".$AllArray9[4]."-".$AllArray9[3] }}">
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+
+                        
+
+                        <label class="w-100 font-weight-bolder" style="margin:10px 0px;padding: 10px 5px !important; border-bottom: 2px solid #f2f2f2; border-top: 2px solid #f2f2f2;">Targeted Shifts</label>
+
+                            {{-- AllschedulesNotPublished --}}
+
+
+                            <div id="schedule_list">
+                                @foreach ($AllschedulesNotPublished as $NotPublishedSch)
+
+                                    @php
+                                        $scUsr = '';
+                                        $scUsr1 = DB::table('users')->where('id', $NotPublishedSch->staff_id)->first();
+                                    
+                                        $scUsr2 = DB::table('customers')->where('id', $NotPublishedSch->customer_id)->first();
+                                    @endphp
+
+
+                                    <a class="not-published schedule-item shift ">
+                                        <i class="color-border @if ($NotPublishedSch->status == "Pending") bg-warning @elseif ($NotPublishedSch->status == "Accepted") bg-success @elseif ($NotPublishedSch->status == "Declined") bg-danger @endif"></i>
+                                        <div class="heading">
+                                            <div class="title">{{ $NotPublishedSch->start_time }} - {{ $NotPublishedSch->end_time }}<span class="time-in-org-tz"></span></div>
+                                                
+                                            </div>
+                                            <div class="details">{{ $scUsr1->name }}</div>
+                                            <div class="details">{{ $scUsr2->name }}</div>
+                                        
+                                    </a>
+                                @endforeach
+                            </div>
+                    </div>
+                    <div class="card-footer bg-light" style="margin-bottom: -32px !important">
+                        <button class="btn btn-sm" type="button" style="background-color: #8A8A8A; color: #fff;" data-bs-dismiss="modal" aria-label="Close">Annuller</button> 
+                        <button class="btn btn-primary btn-sm float-end d-flex align-items-center justify-content-center" type="submit"><i class="me-1" data-feather="save"></i> Publish</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class="page-body">
+        <div class="grid-wrapper assignments week">
+            <div class="grid-header">
+                <div class="cell">
+                    <div class="filter-extras">
+                        <div class="totals">
+                            <div>{{ $total_weekly_hours }} hrs / ${{ $total_weekly_hours_amount }}</div>
+                        </div>
+                    </div>
+                </div>                
+                @foreach (daysInWeek($week) as $schvalue)
+                    @php
+                        $arr = explode("-|-", $schvalue);
+                        $queryDate0 = $arr[2]."-".$arr[4]."-".$arr[3];
+
+                        
+
+                        $total_hours = DB::table('schedules')->where(['date' => $queryDate0])->sum('total_hours');
+                        $total_hourly_amount = DB::table('schedules')->where(['date' => $queryDate0])->sum('total_hourly_wags');
+                    @endphp
+                    <div class="cell">
+                        <div class="title @if (date('d') === $arr[3]) today @endif">
+                            <span class="m-0 p-0" style="margin-bottom: -5px">{{ $arr[6] }}. @if ($arr[1] == "Jan") Januar @elseif($arr[1] == "Feb") Februar @elseif($arr[1] == "Mar") Marts @elseif($arr[1] == "Apr") April @elseif($arr[1] == "May") Maj @elseif($arr[1] == "Jun") Juni @elseif($arr[1] == "Jul") Juli @elseif($arr[1] == "Aug") August @elseif($arr[1] == "Sep") September @elseif($arr[1] == "Oct") Oktober @elseif($arr[1] == "Nov") November @elseif($arr[1] == "Dec") December    @endif
+                            <br>
+                        @if ($arr[0] == "Mon") Mandag @elseif ($arr[0] == "Tue") Tirsdag @elseif ($arr[0] == "Wed") Onsdag @elseif ($arr[0] == "Thu") Torsdag @elseif ($arr[0] == "Fri") Fredag @elseif ($arr[0] == "Sat") Lørdag @elseif ($arr[0] == "Sun") Søndag @endif</span>
+                        </div>
+                        <div class="totals">
+                            <div>{{ $total_hours }} hrs / ${{ $total_hourly_amount }}</div>
+                        </div>
+                    </div>
+
+                @endforeach
+
+
+
+
+            </div>
+
+    
+            <div class="grid drag-container">
+            
+
+
+
+                {{-- open Shift --}}
+                <div class="grid-row no-assignment">
+
+
+                    <div class="cell">
+                        <div class="title" data-toggle="tooltip" title="These are shifts that aren't assigned to a specific {{ request()->active }} yet.">
+                            Open Shifts
+                            <i data-feather="help-circle"></i>
+                        </div>
+                        <div class="totals">
+                          <div class="">0 hrs / $0</div>
+                        </div>
+                    </div>
+
+              
+
+
+                        @foreach (daysInWeek($week) as $key => $wk)
+                            @php
+                                error_reporting(0);
+                                $arrx = explode("-|-", $wk);
+
+                                $queryDate = $arrx[2]."-".$arrx[4]."-".$arrx[3];
+
+
+                                if (request()->active == "Customer"){
+                                    $Openschedules = DB::table('schedules')->where(['date' => $queryDate])->where([ 'customer_id' => 0])->get();
+                                }else{
+                                    $Openschedules = DB::table('schedules')->where(['date' => $queryDate])->where([ 'staff_id' => 0])->get();
+                                }                                
+                            @endphp
+
+
+                            <div class="cell">
+                                @foreach ($Openschedules as $schedule0)
+                                    
+                                   
+                                    @php
+                                        $scUsr = '';
+                                        if (request()->active == "Customer")
+                                        {
+                                            $scUsr = DB::table('users')->where('id', $schedule0->staff_id)->first();
+                                        }else{
+                                            $scUsr = DB::table('customers')->where('id', $schedule0->customer_id)->first();
+                                        }
+                                    @endphp
+
+
+
+                                    <a rel="{{ $schedule0->customer_id."-|-".$schedule0->staff_id."-|-".$schedule0->hourly_wags."-|-".$schedule0->date."-|-".$schedule0->start_time."-|-".$schedule0->end_time."-|-".$schedule0->status."-|-".$schedule0->visibility."-|-".$schedule0->id }}" data-item="{{ $key }}{{ $user000->id }}" class="@if ($schedule0->visibility == "NotPublished") not-published @else published @endif filtered schedule-item shift ui-draggable ui-draggable-handle" data-bs-toggle="modal" data-bs-target="#UpdateSchedule{{ $key }}{{ $user000->id }}">
+                                        <i class="color-border @if ($schedule0->status == "Pending") bg-warning @elseif ($schedule0->status == "Accepted") bg-success @elseif ($schedule0->status == "Declined") bg-danger @endif"></i>
+                                        <div class="heading">
+                                            <div class="title">{{ $schedule0->start_time }} - {{ $schedule0->end_time }}<span class="time-in-org-tz"></span></div>
+                                                
+                                            </div>
+                                            <div class="details">{{ $scUsr->name }}</div>
+                                        
+                                    </a>
+
+                                   
+                                @endforeach
+                                <div ref="{{ $user000->id }}" ref1="{{ $arrx[2]."-".$arrx[4]."-".$arrx[3] }}" ref2="{{ $arrx[0]." - ".$arrx[3]." ".$arrx[1]." ".$arrx[2] }}"  data-item="{{ $key }}{{ $user000->id }}" class="schedule-item-list ui-droppable OpenCreateModal" >
+                                   
+                                </div>
+
+                            </div>
+
+
+                            
+
+
+
+                            
+                        @endforeach
+
+                       
+                </div>
+
+
+
+                @foreach ($scheduleUser as $user000)
+                    @php
+
+                        if (request()->active == "Customer") {
+                            $total_hours0 = DB::table('schedules')->whereBetween('date', $weekRange)->where('customer_id', $user000->id)->sum('total_hours');
+                            $total_hourly_amount0 = DB::table('schedules')->whereBetween('date', $weekRange)->where('customer_id', $user000->id)->sum('total_hourly_wags');
+                        }else{
+                            $total_hours0 = DB::table('schedules')->whereBetween('date', $weekRange)->where('staff_id', $user000->id)->sum('total_hours');
+                            $total_hourly_amount0 = DB::table('schedules')->whereBetween('date', $weekRange)->where('staff_id', $user000->id)->sum('total_hourly_wags');
+                        }
+
+
+                       
+
+
+                    @endphp
+                    <div class="grid-row assignment-row">
+                        <div class="cell">
+                            <a class="title" href="javascript::">{{ $user000->name }}</a>
+                            <div class="totals">
+                              <div class="">{{ $total_hours0 }} hrs / ${{ $total_hourly_amount0 }}</div>
+                            </div>
+                        </div>
+
+                        
+                        @foreach (daysInWeek($week) as $key => $wk)
+                            @php
+                                error_reporting(0);
+                                $arrx = explode("-|-", $wk);
+
+                                $queryDate = $arrx[2]."-".$arrx[4]."-".$arrx[3];
+
+
+                                if (request()->active == "Customer"){
+                                    $Myschedules = DB::table('schedules')->where(['date' => $queryDate])->where([ 'customer_id' => $user000->id])->get();
+                                }else{
+                                    $Myschedules = DB::table('schedules')->where(['date' => $queryDate])->where([ 'staff_id' => $user000->id])->get();
+                                }                                
+                            @endphp
+
+
+                            <div class="cell">
+                                @foreach ($Myschedules as $schedule)
+                                    
+                                   
+                                    @php
+                                        $scUsr = '';
+                                        if (request()->active == "Customer")
+                                        {
+                                            $scUsr = DB::table('users')->where('id', $schedule->staff_id)->first();
+                                        }else{
+                                            $scUsr = DB::table('customers')->where('id', $schedule->customer_id)->first();
+                                        }
+                                    @endphp
+
+
+
+                                    <a rel="{{ $schedule->customer_id."-|-".$schedule->staff_id."-|-".$schedule->hourly_wags."-|-".$schedule->date."-|-".$schedule->start_time."-|-".$schedule->end_time."-|-".$schedule->status."-|-".$schedule->visibility."-|-".$schedule->id }}" data-item="{{ $key }}{{ $user000->id }}" class="@if ($schedule->visibility == "NotPublished") not-published @else published @endif filtered schedule-item shift ui-draggable ui-draggable-handle" data-bs-toggle="modal" data-bs-target="#UpdateSchedule{{ $key }}{{ $user000->id }}">
+                                        <i class="color-border @if ($schedule->status == "Pending") bg-warning @elseif ($schedule->status == "Accepted") bg-success @elseif ($schedule->status == "Declined") bg-danger @endif"></i>
+                                        <div class="heading">
+                                            <div class="title">{{ $schedule->start_time }} - {{ $schedule->end_time }}<span class="time-in-org-tz"></span></div>
+                                                
+                                            </div>
+                                            <div class="details">{{ $scUsr->name }}</div>
+                                        
+                                    </a>
+
+                                   
+                                @endforeach
+                                <div ref="{{ $user000->id }}" ref1="{{ $arrx[2]."-".$arrx[4]."-".$arrx[3] }}" ref2="{{ $arrx[0]." - ".$arrx[3]." ".$arrx[1]." ".$arrx[2] }}"  data-item="{{ $key }}{{ $user000->id }}" class="schedule-item-list ui-droppable OpenCreateModal" >
+                                   
+                                </div>
+
+                            </div>
+
+
+                            
+
+
+
+                            
+                        @endforeach
+
+
+
+                        
+                    </div>
+                @endforeach
+
+                
+
+                <div class="modal fade" id="UpdateSchedule" data-bs-keyboard="false" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                                
+                            <div class="modal-header bg-light">
+                                <h5 class="modal-title d-flex align-items-center justify-content-center"><i class="me-1" data-feather="calendar"></i> 
+                                    <span id="UpdateScheduleHeader">Update Schedule</span></h5>
+                                <button data-item="" type="button" class="btn-close UpdateClose" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+
+                            <ul class="nav nav-pills bg-light" id="pills-tab" role="tablist" style="border-bottom: 1px solid #d5dce6;">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="pills-detail-tab{{ $schedule->id }}" data-bs-toggle="pill" data-bs-target="#pills-detail{{ $schedule->id }}" type="button" role="tab" aria-controls="pills-detail" aria-selected="true">Detail</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="pills-copy-tab{{ $schedule->id }}" data-bs-toggle="pill" data-bs-target="#pills-copy{{ $schedule->id }}" type="button" role="tab" aria-controls="pills-copy" aria-selected="false">Copy</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="pills-note-tab{{ $schedule->id }}" data-bs-toggle="pill" data-bs-target="#pills-note{{ $schedule->id }}" type="button" role="tab" aria-controls="pills-note" aria-selected="false">Note</button>
+                                </li>
+                            </ul>
+                            <div class="modal-body">
+
+
+                                
+                                <div class="tab-content" id="pills-tabContent">
+                                    <div class="tab-pane fade show active" id="pills-detail{{ $schedule->id }}" role="tabpanel" aria-labelledby="pills-detail-tab{{ $schedule->id }}">
+                                        <form class="pt-3" method="post" id="MyUpdateScheduleForm" action="{{ url('/schedule/update/'.$schedule->id) }}">
+                                            @csrf
+                                            
+                                            <div class="row gx-3 mb-3">
+
+
+                                                <div class="col-md-12">
+                                                    <label class="small mb-1">Customer</label>
+                                                    <div class="input-group mb-3">
+                                                        <div class="input-group-prepend">
+                                                            <span class="input-group-text bg-light"><i class="me-1" data-feather="briefcase"></i></span>
+                                                        </div>
+                                                        <select class="form-control" name="customer_id" id="customer_id" required>
+                                                           <option value="0">Open Shift</option>
+                                                            @foreach ($AllCustomers as $customer001)
+                                                                <option  value="{{ $customer001->id }}"
+                                                                   @if ($customer0001->id == $schedule->customer_id)
+                                                                       selected 
+                                                                   @endif
+                                                               >{{ $customer001->name }}</option>
+                                                            @endforeach
+                                                        </select>
+
+                                                        
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row gx-3 mb-3">
+
+                                                <div class="col-md-8">
+                                                    <label class="small mb-1">Staff</label>
+                                                    <div class="input-group mb-3">
+                                                        <div class="input-group-prepend">
+                                                            <span class="input-group-text bg-light"><i class="me-1" data-feather="user"></i></span>
+                                                        </div>
+                                                        <select class="form-control" name="staff_id" id="staff_id" required>
+                                                           <option value="0">Open Shift</option>
+                                                            @foreach ($AllUser as $user91)
+                                                                <option  value="{{ $user91->id }}"
+                                                                    @if ($user91->id == $schedule->staff_id)
+                                                                        selected 
+                                                                    @endif
+                                                                >{{ $user91->name }}</option>
+                                                            @endforeach
+                                                        </select>
+
+                                                        
+                                                    </div>
+                                                </div>
+
+
+
+                                                <div class="col-md-4">
+                                                    <label class="small mb-1">Hourly Wage</label>
+                                                    <div class="input-group mb-3">
+                                                        <div class="input-group-prepend">
+                                                            <span class="input-group-text bg-light"><i class="me-1" data-feather="dollar-sign"></i></span>
+                                                        </div>
+                                                        <input type="number" name="hourly_wags" id="hourly_wags" required class="form-control input" value="{{ $schedule->hourly_wags }}">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+
+                                            <div class="row gx-3 mb-3">
+                                                <div class="col-md-4">
+                                                    <label class="small mb-1">Date </label>
+                                                    <input type="date" class="form-control input" name="date" id="date" required value="{{ $schedule->date }}">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="small mb-1">Start Time </label>
+
+                                                    <select class="form-control" name="start_time" id="start_time" required>
+                                                        <option value="00:00"
+                                                        @if ($schedule->start_time == "00:00")
+                                                            selected 
+                                                        @endif
+                                                        >00:00</option>
+                                                        <option value="00:30"
+                                                        @if ($schedule->start_time == "00:30")
+                                                            selected 
+                                                        @endif
+                                                        >00:30</option>
+                                                        <option value="01:00"
+                                                        @if ($schedule->start_time == "01:00")
+                                                            selected 
+                                                        @endif
+                                                        >01:00</option>
+                                                        <option value="01:30"
+                                                        @if ($schedule->start_time == "01:30")
+                                                            selected 
+                                                        @endif
+                                                        >01:30</option>
+                                                        <option value="02:00"
+                                                        @if ($schedule->start_time == "02:00")
+                                                            selected 
+                                                        @endif
+                                                        >02:00</option>
+                                                        <option value="02:30"
+                                                        @if ($schedule->start_time == "02:30")
+                                                            selected 
+                                                        @endif
+                                                        >02:30</option>
+                                                        <option value="03:00"
+                                                        @if ($schedule->start_time == "03:00")
+                                                            selected 
+                                                        @endif
+                                                        >03:00</option>
+                                                        <option value="03:30"
+                                                        @if ($schedule->start_time == "03:30")
+                                                            selected 
+                                                        @endif
+                                                        >03:30</option>
+                                                        <option value="04:00"
+                                                        @if ($schedule->start_time == "04:00")
+                                                            selected 
+                                                        @endif
+                                                        >04:00</option>
+                                                        <option value="04:30"
+                                                        @if ($schedule->start_time == "04:30")
+                                                            selected 
+                                                        @endif
+                                                        >04:30</option>
+                                                        <option value="05:00"
+                                                        @if ($schedule->start_time == "05:00")
+                                                            selected 
+                                                        @endif
+                                                        >05:00</option>
+                                                        <option value="05:30"
+                                                        @if ($schedule->start_time == "05:30")
+                                                            selected 
+                                                        @endif
+                                                        >05:30</option>
+                                                        <option value="06:00"
+                                                        @if ($schedule->start_time == "06:00")
+                                                            selected 
+                                                        @endif
+                                                        >06:00</option>
+                                                        <option value="06:30"
+                                                        @if ($schedule->start_time == "06:30")
+                                                            selected 
+                                                        @endif
+                                                        >06:30</option>
+                                                        <option value="07:00"
+                                                        @if ($schedule->start_time == "07:00")
+                                                            selected 
+                                                        @endif
+                                                        >07:00</option>
+                                                        <option value="07:30"
+                                                        @if ($schedule->start_time == "07:30")
+                                                            selected 
+                                                        @endif
+                                                        >07:30</option>
+                                                        <option value="08:00"
+                                                        @if ($schedule->start_time == "08:00")
+                                                            selected 
+                                                        @endif
+                                                        >08:00</option>
+                                                        <option value="08:30"
+                                                        @if ($schedule->start_time == "08:30")
+                                                            selected 
+                                                        @endif
+                                                        >08:30</option>
+                                                        <option value="09:00"
+                                                        @if ($schedule->start_time == "09:00")
+                                                            selected 
+                                                        @endif
+                                                        >09:00</option>
+                                                        <option value="09:30"
+                                                        @if ($schedule->start_time == "09:30")
+                                                            selected 
+                                                        @endif
+                                                        >09:30</option>
+                                                        <option value="10:00"
+                                                        @if ($schedule->start_time == "10:00")
+                                                            selected 
+                                                        @endif
+                                                        >10:00</option>
+                                                        <option value="10:30"
+                                                        @if ($schedule->start_time == "10:30")
+                                                            selected 
+                                                        @endif
+                                                        >10:30</option>
+                                                        <option value="11:00"
+                                                        @if ($schedule->start_time == "11:00")
+                                                            selected 
+                                                        @endif
+                                                        >11:00</option>
+                                                        <option value="11:30"
+                                                        @if ($schedule->start_time == "11:30")
+                                                            selected 
+                                                        @endif
+                                                        >11:30</option>
+                                                        <option value="12:00"
+                                                        @if ($schedule->start_time == "12:00")
+                                                            selected 
+                                                        @endif
+                                                        >12:00</option>
+                                                        <option value="12:30"
+                                                        @if ($schedule->start_time == "12:30")
+                                                            selected 
+                                                        @endif
+                                                        >12:30</option>
+                                                        <option value="13:00"
+                                                        @if ($schedule->start_time == "13:00")
+                                                            selected 
+                                                        @endif
+                                                        >13:00</option>
+                                                        <option value="13:30"
+                                                        @if ($schedule->start_time == "13:30")
+                                                            selected 
+                                                        @endif
+                                                        >13:30</option>
+                                                        <option value="14:00"
+                                                        @if ($schedule->start_time == "14:00")
+                                                            selected 
+                                                        @endif
+                                                        >14:00</option>
+                                                        <option value="14:30"
+                                                        @if ($schedule->start_time == "14:30")
+                                                            selected 
+                                                        @endif
+                                                        >14:30</option>
+                                                        <option value="15:00"
+                                                        @if ($schedule->start_time == "15:00")
+                                                            selected 
+                                                        @endif
+                                                        >15:00</option>
+                                                        <option value="15:30"
+                                                        @if ($schedule->start_time == "15:30")
+                                                            selected 
+                                                        @endif
+                                                        >15:30</option>
+                                                        <option value="16:00"
+                                                        @if ($schedule->start_time == "16:00")
+                                                            selected 
+                                                        @endif
+                                                        >16:00</option>
+                                                        <option value="16:30"
+                                                        @if ($schedule->start_time == "16:30")
+                                                            selected 
+                                                        @endif
+                                                        >16:30</option>
+                                                        <option value="17:00"
+                                                        @if ($schedule->start_time == "17:00")
+                                                            selected 
+                                                        @endif
+                                                        >17:00</option>
+                                                        <option value="17:30"
+                                                        @if ($schedule->start_time == "17:30")
+                                                            selected 
+                                                        @endif
+                                                        >17:30</option>
+                                                        <option value="18:00"
+                                                        @if ($schedule->start_time == "18:00")
+                                                            selected 
+                                                        @endif
+                                                        >18:00</option>
+                                                        <option value="18:30"
+                                                        @if ($schedule->start_time == "18:30")
+                                                            selected 
+                                                        @endif
+                                                        >18:30</option>
+                                                        <option value="19:00"
+                                                        @if ($schedule->start_time == "19:00")
+                                                            selected 
+                                                        @endif
+                                                        >19:00</option>
+                                                        <option value="19:30"
+                                                        @if ($schedule->start_time == "19:30")
+                                                            selected 
+                                                        @endif
+                                                        >19:30</option>
+                                                        <option value="20:00"
+                                                        @if ($schedule->start_time == "20:00")
+                                                            selected 
+                                                        @endif
+                                                        >20:00</option>
+                                                        <option value="20:30"
+                                                        @if ($schedule->start_time == "20:30")
+                                                            selected 
+                                                        @endif
+                                                        >20:30</option>
+                                                        <option value="21:00"
+                                                        @if ($schedule->start_time == "21:00")
+                                                            selected 
+                                                        @endif
+                                                        >21:00</option>
+                                                        <option value="21:30"
+                                                        @if ($schedule->start_time == "21:30")
+                                                            selected 
+                                                        @endif
+                                                        >21:30</option>
+                                                        <option value="22:00"
+                                                        @if ($schedule->start_time == "22:00")
+                                                            selected 
+                                                        @endif
+                                                        >22:00</option>
+                                                        <option value="22:30"
+                                                        @if ($schedule->start_time == "22:30")
+                                                            selected 
+                                                        @endif
+                                                        >22:30</option>
+                                                        <option value="23:00"
+                                                        @if ($schedule->start_time == "23:00")
+                                                            selected 
+                                                        @endif
+                                                        >23:00</option>
+                                                        <option value="23:30"
+                                                        @if ($schedule->start_time == "23:30")
+                                                            selected 
+                                                        @endif
+                                                        >23:30</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="small mb-1">End Time</label>
+
+                                                    <select class="form-control" name="end_time" id="end_time" required>
+                                                        <option value="00:00"
+                                                        @if ($schedule->end_time == "00:00")
+                                                            selected 
+                                                        @endif
+                                                        >00:00</option>
+                                                        <option value="00:30"
+                                                        @if ($schedule->end_time == "00:30")
+                                                            selected 
+                                                        @endif
+                                                        >00:30</option>
+                                                        <option value="01:00"
+                                                        @if ($schedule->end_time == "01:00")
+                                                            selected 
+                                                        @endif
+                                                        >01:00</option>
+                                                        <option value="01:30"
+                                                        @if ($schedule->end_time == "01:30")
+                                                            selected 
+                                                        @endif
+                                                        >01:30</option>
+                                                        <option value="02:00"
+                                                        @if ($schedule->end_time == "02:00")
+                                                            selected 
+                                                        @endif
+                                                        >02:00</option>
+                                                        <option value="02:30"
+                                                        @if ($schedule->end_time == "02:30")
+                                                            selected 
+                                                        @endif
+                                                        >02:30</option>
+                                                        <option value="03:00"
+                                                        @if ($schedule->end_time == "03:00")
+                                                            selected 
+                                                        @endif
+                                                        >03:00</option>
+                                                        <option value="03:30"
+                                                        @if ($schedule->end_time == "03:30")
+                                                            selected 
+                                                        @endif
+                                                        >03:30</option>
+                                                        <option value="04:00"
+                                                        @if ($schedule->end_time == "04:00")
+                                                            selected 
+                                                        @endif
+                                                        >04:00</option>
+                                                        <option value="04:30"
+                                                        @if ($schedule->end_time == "04:30")
+                                                            selected 
+                                                        @endif
+                                                        >04:30</option>
+                                                        <option value="05:00"
+                                                        @if ($schedule->end_time == "05:00")
+                                                            selected 
+                                                        @endif
+                                                        >05:00</option>
+                                                        <option value="05:30"
+                                                        @if ($schedule->end_time == "05:30")
+                                                            selected 
+                                                        @endif
+                                                        >05:30</option>
+                                                        <option value="06:00"
+                                                        @if ($schedule->end_time == "06:00")
+                                                            selected 
+                                                        @endif
+                                                        >06:00</option>
+                                                        <option value="06:30"
+                                                        @if ($schedule->end_time == "06:30")
+                                                            selected 
+                                                        @endif
+                                                        >06:30</option>
+                                                        <option value="07:00"
+                                                        @if ($schedule->end_time == "07:00")
+                                                            selected 
+                                                        @endif
+                                                        >07:00</option>
+                                                        <option value="07:30"
+                                                        @if ($schedule->end_time == "07:30")
+                                                            selected 
+                                                        @endif
+                                                        >07:30</option>
+                                                        <option value="08:00"
+                                                        @if ($schedule->end_time == "08:00")
+                                                            selected 
+                                                        @endif
+                                                        >08:00</option>
+                                                        <option value="08:30"
+                                                        @if ($schedule->end_time == "08:30")
+                                                            selected 
+                                                        @endif
+                                                        >08:30</option>
+                                                        <option value="09:00"
+                                                        @if ($schedule->end_time == "09:00")
+                                                            selected 
+                                                        @endif
+                                                        >09:00</option>
+                                                        <option value="09:30"
+                                                        @if ($schedule->end_time == "09:30")
+                                                            selected 
+                                                        @endif
+                                                        >09:30</option>
+                                                        <option value="10:00"
+                                                        @if ($schedule->end_time == "10:00")
+                                                            selected 
+                                                        @endif
+                                                        >10:00</option>
+                                                        <option value="10:30"
+                                                        @if ($schedule->end_time == "10:30")
+                                                            selected 
+                                                        @endif
+                                                        >10:30</option>
+                                                        <option value="11:00"
+                                                        @if ($schedule->end_time == "11:00")
+                                                            selected 
+                                                        @endif
+                                                        >11:00</option>
+                                                        <option value="11:30"
+                                                        @if ($schedule->end_time == "11:30")
+                                                            selected 
+                                                        @endif
+                                                        >11:30</option>
+                                                        <option value="12:00"
+                                                        @if ($schedule->end_time == "12:00")
+                                                            selected 
+                                                        @endif
+                                                        >12:00</option>
+                                                        <option value="12:30"
+                                                        @if ($schedule->end_time == "12:30")
+                                                            selected 
+                                                        @endif
+                                                        >12:30</option>
+                                                        <option value="13:00"
+                                                        @if ($schedule->end_time == "13:00")
+                                                            selected 
+                                                        @endif
+                                                        >13:00</option>
+                                                        <option value="13:30"
+                                                        @if ($schedule->end_time == "13:30")
+                                                            selected 
+                                                        @endif
+                                                        >13:30</option>
+                                                        <option value="14:00"
+                                                        @if ($schedule->end_time == "14:00")
+                                                            selected 
+                                                        @endif
+                                                        >14:00</option>
+                                                        <option value="14:30"
+                                                        @if ($schedule->end_time == "14:30")
+                                                            selected 
+                                                        @endif
+                                                        >14:30</option>
+                                                        <option value="15:00"
+                                                        @if ($schedule->end_time == "15:00")
+                                                            selected 
+                                                        @endif
+                                                        >15:00</option>
+                                                        <option value="15:30"
+                                                        @if ($schedule->end_time == "15:30")
+                                                            selected 
+                                                        @endif
+                                                        >15:30</option>
+                                                        <option value="16:00"
+                                                        @if ($schedule->end_time == "16:00")
+                                                            selected 
+                                                        @endif
+                                                        >16:00</option>
+                                                        <option value="16:30"
+                                                        @if ($schedule->end_time == "16:30")
+                                                            selected 
+                                                        @endif
+                                                        >16:30</option>
+                                                        <option value="17:00"
+                                                        @if ($schedule->end_time == "17:00")
+                                                            selected 
+                                                        @endif
+                                                        >17:00</option>
+                                                        <option value="17:30"
+                                                        @if ($schedule->end_time == "17:30")
+                                                            selected 
+                                                        @endif
+                                                        >17:30</option>
+                                                        <option value="18:00"
+                                                        @if ($schedule->end_time == "18:00")
+                                                            selected 
+                                                        @endif
+                                                        >18:00</option>
+                                                        <option value="18:30"
+                                                        @if ($schedule->end_time == "18:30")
+                                                            selected 
+                                                        @endif
+                                                        >18:30</option>
+                                                        <option value="19:00"
+                                                        @if ($schedule->end_time == "19:00")
+                                                            selected 
+                                                        @endif
+                                                        >19:00</option>
+                                                        <option value="19:30"
+                                                        @if ($schedule->end_time == "19:30")
+                                                            selected 
+                                                        @endif
+                                                        >19:30</option>
+                                                        <option value="20:00"
+                                                        @if ($schedule->end_time == "20:00")
+                                                            selected 
+                                                        @endif
+                                                        >20:00</option>
+                                                        <option value="20:30"
+                                                        @if ($schedule->end_time == "20:30")
+                                                            selected 
+                                                        @endif
+                                                        >20:30</option>
+                                                        <option value="21:00"
+                                                        @if ($schedule->end_time == "21:00")
+                                                            selected 
+                                                        @endif
+                                                        >21:00</option>
+                                                        <option value="21:30"
+                                                        @if ($schedule->end_time == "21:30")
+                                                            selected 
+                                                        @endif
+                                                        >21:30</option>
+                                                        <option value="22:00"
+                                                        @if ($schedule->end_time == "22:00")
+                                                            selected 
+                                                        @endif
+                                                        >22:00</option>
+                                                        <option value="22:30"
+                                                        @if ($schedule->end_time == "22:30")
+                                                            selected 
+                                                        @endif
+                                                        >22:30</option>
+                                                        <option value="23:00"
+                                                        @if ($schedule->end_time == "23:00")
+                                                            selected 
+                                                        @endif
+                                                        >23:00</option>
+                                                        <option value="23:30"
+                                                        @if ($schedule->end_time == "23:30")
+                                                            selected 
+                                                        @endif
+                                                        >23:30</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="row gx-3 mb-3">
+                                               
+                                                <div class="col-md-6">
+                                                    <label class="small mb-1">Status </label>
+                                                    <select class="form-control" name="status" id="status" required>
+                                                        <option value="Pending"
+                                                        @if ($schedule->status == "Pending")
+                                                            selected 
+                                                        @endif
+                                                        >Pending</option>
+                                                        <option value="Accepted"
+                                                        @if ($schedule->status == "Accepted")
+                                                            selected 
+                                                        @endif
+                                                        >Accepted</option>
+                                                        
+                                                        <option value="Declined"
+                                                        @if ($schedule->status == "Declined")
+                                                            selected 
+                                                        @endif
+                                                        >Declined</option>
+
+                                                        
+                                                    </select>
+                                                </div>
+
+                                                <div class="col-md-6">
+                                                    <label class="small mb-1">Visibility </label>
+                                                    <select class="form-control" name="visibility" id="visibility" required>
+                                                        <option value="Published"
+                                                        @if ($schedule->visibility == "Published")
+                                                            selected 
+                                                        @endif
+                                                        >Published</option>
+                                                        <option value="NotPublished"
+                                                        @if ($schedule->visibility == "NotPublished")
+                                                            selected 
+                                                        @endif
+                                                        >Not Published</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="bg-light" style="padding: 18px !important; margin: 12px -16px -32px -16px !important; border-radius: 0 0px 10px 10px;">
+                                                <a id="DeleteSchedule" href="{{ url('/schedule/delete/'.$schedule->id) }}" onclick="return confirm('Are you sure to delete ?')" class="btn btn-danger btn-sm" >Delete</a> 
+                                                <button class="btn btn-primary btn-sm float-end d-flex align-items-center justify-content-center" type="submit"><i class="me-1" data-feather="edit"></i> Update</button>
+                                            </div>
+
+
+                                        </form>
+                                    </div>
+                                    <div class="tab-pane fade" id="pills-copy{{ $schedule->id }}" role="tabpanel" aria-labelledby="pills-copy-tab{{ $schedule->id }}">
+                                        <form class="pt-3" method="post" id="MyCopyScheduleForm" action="{{ url('/schedule/copy/'.$schedule->id) }}">
+                                            @csrf
+
+                                            <input type="hidden" name="type" value="{{ request()->active }}">
+
+                                            <a class="@if ($schedule->visibility == "NotPublished") not-published @else published @endif filtered schedule-item shift ui-draggable ui-draggable-handle" data-bs-toggle="modal" data-bs-target="#UpdateSchedule{{ $key }}{{ $user000->id }}">
+                                                <i class="color-border @if ($schedule->status == "Pending") bg-warning @elseif ($schedule->status == "Accepted") bg-success @elseif ($schedule->status == "Declined") bg-danger @endif"></i>
+                                                <div class="heading">
+                                                    <div class="title">{{ $schedule->start_time }} - {{ $schedule->end_time }}<span class="time-in-org-tz"></span></div>
+                                                        
+                                                    </div>
+                                                    <div class="details">{{ $scUsr->name }}</div>
+                                                
+                                            </a>
+
+                                            
+                                            <label class="w-100 font-weight-bolder" style="margin:10px 0px;padding: 10px 5px !important; border-bottom: 2px solid #f2f2f2; border-top: 2px solid #f2f2f2;">Copy to Other Weekdays</label>
+
+                                            @foreach (daysInWeek($week) as $value)
+                                                @php
+                                                    error_reporting(0);
+                                                    $arrxday = explode("-|-", $value);
+                                                @endphp
+                                                <div class="row gx-3 mb-3">
+                                                    <div class="col-md-12">
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" id="{{ $arrxday[5] }}" value="{{ $arrxday[2]."-".$arrxday[4]."-".$arrxday[3] }}"  @if ($schedule->date == $arrxday[2]."-".$arrxday[4]."-".$arrxday[3]) disabled @endif type="checkbox" name="scheduleCopy[]">
+                                                            <label class="form-check-label" for="{{ $arrxday[5] }}">{{ $arrxday[5] }}</label>
+                                                        </div>
+                                                        
+                                                    </div>
+
+                                                </div>
+
+                                            @endforeach
+
+                                       
+
+
+                                            
+
+                                            <div class="bg-light" style="padding: 18px !important; margin: 12px -16px -32px -16px !important; border-radius: 0 0px 10px 10px;">
+                                                <a  id="DeleteSchedule" href="{{ url('/schedule/delete/'.$schedule->id) }}" onclick="return confirm('Are you sure to delete ?')" class="btn btn-danger btn-sm" >Delete</a> 
+                                                <button class="btn btn-primary btn-sm float-end d-flex align-items-center justify-content-center" type="submit"><i class="me-1" data-feather="copy"></i> Copy</button>
+                                            </div>
+
+
+                                        </form>
+                                    </div>
+                                    <div class="tab-pane fade" id="pills-note{{ $schedule->id }}" role="tabpanel" aria-labelledby="pills-note-tab{{ $schedule->id }}">
+                                        <div class="CreateNoteContainer">
+                                            <form method="post" id="MyNoteScheduleForm" action="{{ url('/schedule/note/store/'.$schedule->id) }}">
+                                                @csrf
+                                                
+                                                <div class="row gx-3 mb-3">
+                                                    <div class="col-md-12">
+                                                        <label class="small mb-1">Title</label>
+                                                        <input type="text" name="title" class="form-control" required>                                                        
+                                                    </div>                                                    
+                                                </div>
+
+                                                <div class="row gx-3 mb-3">
+                                                    <div class="col-md-12">
+                                                        <label class="small mb-1">Description</label>
+                                                        <textarea class="form-control" name="description" rows="4"></textarea>
+                                                    </div>                                                    
+                                                </div>
+
+
+                                                <a href="javascript::" class="btn btn-secondary btn-sm CreateNoteClose" >Close</a> 
+                                                <button class="btn btn-primary btn-sm float-end d-flex align-items-center justify-content-center" type="submit"><i class="me-1" data-feather="save"></i> Save</button>
+
+                                                
+                                            </form>
+                                            <br clear="all">
+                                        </div>
+                                        <div class="container">
+                                            <a href="javascript::" class="font-weight-bolder CreateNoteBtn" style="float: right !important;">Create Note</a>
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Note</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @php
+                                                        $notes = DB::table('schedule_notes')->where('schedule_id', $schedule->id)->get();
+                                                    @endphp
+                                                    @foreach ($notes as $note)
+                                                        <tr>
+                                                            <td class="w-75">
+                                                                <b>{{ $note->title }}</b> <br>
+                                                                {{ $note->description }}
+                                                            </td>
+                                                            <td class="w-25" style="vertical-align: middle !important;">
+                                                                <a onclick="return confirm('Are you sure to delete ?')" class="btn-datatable btn-icon btn-transparent-dark" href="{{ url('/schedule/note/delete/'.$note->id) }}"><i data-feather="trash-2"></i></a>
+                                                            </td>
+
+
+                                                        </tr>
+
+
+
+
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                
+                                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="modal fade" id="CreateSchedule" data-bs-keyboard="false" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <form method="post" action="{{ url('/schedule/store') }}">
+                                @csrf
+
+                                <input type="hidden" name="type" @if (request()->active == "Customer") value="Customer" @else value="Staff" @endif>
+                                
+                                <div class="modal-header bg-light">
+                                    <h5 class="modal-title d-flex align-items-center justify-content-center"><i class="me-1" data-feather="calendar"></i> <span id="CreateScheduleHeader">Schedule for </span></h5>
+                                    <button data-item="" type="button" class="btn-close CreateClose" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    
+
+                                    <div class="row gx-3 mb-3">
+
+
+                                        <div class="col-md-12">
+                                            <label class="small mb-1">Customer</label>
+                                            <div class="input-group mb-3">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text bg-light"><i class="me-1" data-feather="briefcase"></i></span>
+                                                </div>
+                                                <select class="form-control" name="customer_id" id="customer_id1" required>
+                                                    <option value="0">Open Shift</option>
+                                                    @foreach ($AllCustomers as $customer001)
+                                                        <option  value="{{ $customer001->id }}"
+                                                            @if ($customer001->id == $user000->id)
+                                                                selected 
+                                                            @endif
+                                                        >{{ $customer001->name }}</option>
+                                                    @endforeach
+                                                </select>
+
+                                                
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row gx-3 mb-3">
+
+                                        <div class="col-md-8">
+                                            <label class="small mb-1">Staff</label>
+                                            <div class="input-group mb-3">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text bg-light"><i class="me-1" data-feather="user"></i></span>
+                                                </div>
+                                                <select class="form-control" name="staff_id" id="staff_id1" required>
+                                                    <option value="0">Open Shift</option>
+                                                    @foreach ($AllUser as $user91)
+                                                        <option  value="{{ $user91->id }}"
+                                                            @if ($user91->id == $user000->id)
+                                                                selected 
+                                                            @endif
+                                                        >{{ $user91->name }}</option>
+                                                    @endforeach
+                                                </select>
+
+                                                
+                                            </div>
+                                        </div>
+
+
+
+                                        <div class="col-md-4">
+                                            <label class="small mb-1">Hourly Wage</label>
+                                            <div class="input-group mb-3">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text bg-light"><i class="me-1" data-feather="dollar-sign"></i></span>
+                                                </div>
+                                                <input type="number" name="hourly_wags" id="hourly_wags" required class="form-control input">
+                                            </div>
+                                        </div>
+                                    </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                    <div class="row gx-3 mb-3">
+                                        <div class="col-md-4">
+                                            <label class="small mb-1">Date </label>
+                                            <input type="date" class="form-control input" name="date" id="date1" required value="">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small mb-1">Start Time </label>
+                                            <input type="time" class="form-control" name="start_time" required>
+                                            {{-- <select class="form-control" name="start_time" required>
+                                                <option value="00:00">00:00</option>
+                                                <option value="00:30">00:30</option>
+                                                <option value="01:00">01:00</option>
+                                                <option value="01:30">01:30</option>
+                                                <option value="02:00">02:00</option>
+                                                <option value="02:30">02:30</option>
+                                                <option value="03:00">03:00</option>
+                                                <option value="03:30">03:30</option>
+                                                <option value="04:00">04:00</option>
+                                                <option value="04:30">04:30</option>
+                                                <option value="05:00">05:00</option>
+                                                <option value="05:30">05:30</option>
+                                                <option value="06:00">06:00</option>
+                                                <option value="06:30">06:30</option>
+                                                <option value="07:00">07:00</option>
+                                                <option value="07:30">07:30</option>
+                                                <option value="08:00" selected>08:00</option>
+                                                <option value="08:30">08:30</option>
+                                                <option value="09:00">09:00</option>
+                                                <option value="09:30">09:30</option>
+                                                <option value="10:00">10:00</option>
+                                                <option value="10:30">10:30</option>
+                                                <option value="11:00">11:00</option>
+                                                <option value="11:30">11:30</option>
+
+                                                <option value="12:00">12:00</option>
+                                                <option value="12:30">12:30</option>
+                                                <option value="13:00">13:00</option>
+                                                <option value="13:30">13:30</option>
+                                                <option value="14:00">14:00</option>
+                                                <option value="14:30">14:30</option>
+                                                <option value="15:00">15:00</option>
+                                                <option value="15:30">15:30</option>
+                                                <option value="16:00">16:00</option>
+                                                <option value="16:30">16:30</option>
+                                                <option value="17:00">17:00</option>
+                                                <option value="17:30">17:30</option>
+                                                <option value="18:00">18:00</option>
+                                                <option value="18:30">18:30</option>
+                                                <option value="19:00">19:00</option>
+                                                <option value="19:30">19:30</option>
+                                                <option value="20:00">20:00</option>
+                                                <option value="20:30">20:30</option>
+                                                <option value="21:00">21:00</option>
+                                                <option value="21:30">21:30</option>
+                                                <option value="22:00">22:00</option>
+                                                <option value="22:30">22:30</option>
+                                                <option value="23:00">23:00</option>
+                                                <option value="23:30">23:30</option>
+                                            </select> --}}
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small mb-1">End Time </label>
+                                            <select class="form-control" name="end_time" required>
+                                                <option value="00:00">00:00</option>
+                                                <option value="00:30">00:30</option>
+                                                <option value="01:00">01:00</option>
+                                                <option value="01:30">01:30</option>
+                                                <option value="02:00">02:00</option>
+                                                <option value="02:30">02:30</option>
+                                                <option value="03:00">03:00</option>
+                                                <option value="03:30">03:30</option>
+                                                <option value="04:00">04:00</option>
+                                                <option value="04:30">04:30</option>
+                                                <option value="05:00">05:00</option>
+                                                <option value="05:30">05:30</option>
+                                                <option value="06:00">06:00</option>
+                                                <option value="06:30">06:30</option>
+                                                <option value="07:00">07:00</option>
+                                                <option value="07:30">07:30</option>
+                                                <option value="08:00">08:00</option>
+                                                <option value="08:30">08:30</option>
+                                                <option value="09:00">09:00</option>
+                                                <option value="09:30">09:30</option>
+                                                <option value="10:00">10:00</option>
+                                                <option value="10:30">10:30</option>
+                                                <option value="11:00">11:00</option>
+                                                <option value="11:30">11:30</option>
+
+                                                <option value="12:00">12:00</option>
+                                                <option value="12:30">12:30</option>
+                                                <option value="13:00">13:00</option>
+                                                <option value="13:30" selected>13:30</option>
+                                                <option value="14:00">14:00</option>
+                                                <option value="14:30">14:30</option>
+                                                <option value="15:00">15:00</option>
+                                                <option value="15:30">15:30</option>
+                                                <option value="16:00">16:00</option>
+                                                <option value="16:30">16:30</option>
+                                                <option value="17:00">17:00</option>
+                                                <option value="17:30">17:30</option>
+                                                <option value="18:00">18:00</option>
+                                                <option value="18:30">18:30</option>
+                                                <option value="19:00">19:00</option>
+                                                <option value="19:30">19:30</option>
+                                                <option value="20:00">20:00</option>
+                                                <option value="20:30">20:30</option>
+                                                <option value="21:00">21:00</option>
+                                                <option value="21:30">21:30</option>
+                                                <option value="22:00">22:00</option>
+                                                <option value="22:30">22:30</option>
+                                                <option value="23:00">23:00</option>
+                                                <option value="23:30">23:30</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="row gx-3 mb-3">
+                                       
+                                        <div class="col-md-6">
+                                            <label class="small mb-1">Status </label>
+                                            <select class="form-control" name="status" required>
+                                                <option value="Pending">Pending</option>
+                                                <option value="Accepted">Accepted</option>
+                                                <option value="Declined">Declined</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label class="small mb-1">Visibility </label>
+                                            <select class="form-control" name="visibility" required>
+                                                <option value="Published">Published</option>
+                                                <option value="NotPublished">Not Published</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-light" style="margin-bottom: -32px !important">
+                                    <button class="btn btn-sm CreateClose" type="button" style="background-color: #8A8A8A; color: #fff;" data-bs-dismiss="modal" aria-label="Close">Annuller</button> 
+                                    <button class="btn btn-primary btn-sm float-end d-flex align-items-center justify-content-center" type="submit"><i class="me-1" data-feather="save"></i> Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+@endsection
+@endsection
+@section('js')
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+
+
+        // In your Javascript (external .js resource or <script> tag)
+        $(document).ready(function() {
+            $('.select').select2();
+        });
+
+        $( ".schedule-item-list" ).droppable({
+                accept: ".schedule-item",
+                drop: function( event, ui ) {
+
+                    const draggableValues = ui.draggable.attr("rel");
+                    const draggableArray = draggableValues.split("-|-");
+
+                    
+                    
+                    const schedule_id = draggableArray[8];
+                    const target_user_id = event.target.attributes[0].value;
+                    const target_date = event.target.attributes[1].value;
+
+
+                    const type = "{{ request()->active }}";
+                    console.log(type);
+
+
+                    // console.log(`schedule_id = ${schedule_id} : target_user_id = ${target_user_id} : target_date : ${target_date}`);
+
+
+                    var url = "{{ url('/schedule/drag/update/') }}/"+schedule_id;
+                    $.ajax({
+                        type: 'get',
+                        url: url,
+                        data: {
+                            date: target_date,
+                            user_id: target_user_id,
+                            type: type,
+                        },
+                        success: function(resp) {
+                            location.reload();
+                        },
+                        error: function(resp) {
+                            alert("Opps Try Agian...");
+                        }
+                    });
+                    
+
+
+
+                }
+        });
+
+        
+
+        $(".schedule-item").draggable({
+            // connectToSortable: $('.drag-container'),
+            containment: $(".drag-container"),
+            // helper: "clone",
+            revert: "invalid",
+        });  
+    
+
+
+
+
+
+        $("#end_date").on('change', function() {
+            let start_date = $("#start_date").val();
+            let end_date = $(this).val();
+            
+            var url = "{{ url('/schedule/by/date-range') }}";
+            $.ajax({
+                type: 'get',
+                url: url,
+                data: {
+                    start_date: start_date,
+                    end_date: end_date,
+                },
+                success: function(response)
+                {
+                    // console.log(response.length);
+
+                    
+                    $('#schedule_list').empty();
+
+                    if(response.length === 0){
+                        $('#schedule_list').append(`
+                            <h4>No record found...</h4>
+                        `);
+                        
+                    }else{
+
+                        response.forEach(function(item){
+                            
+                            var status = item.status;
+                            var start_time = item.start_time;
+                            var end_time = item.end_time;
+                            var customer = item.customer;
+                            var staff = item.staff;
+
+
+                            var icons = '';
+
+                          
+
+
+                            if(status === "Pending"){
+                                icons = `<i class="color-border bg-warning"></i>`;
+                            }else if(status === "Accepted"){
+                                icons = `<i class="color-border bg-success"></i>`;                            
+                            }else{
+                                icons = `<i class="color-border bg-danger"></i>`;                            
+                            }
+                                                           
+
+                            var tr_str = `
+                                <a class="not-published schedule-item shift ">
+                                    ${icons}
+                                    <div class="heading">
+                                        <div class="title">${start_time} - ${end_time}<span class="time-in-org-tz"></span></div>
+                                            
+                                        </div>
+                                        <div class="details">${customer}</div>
+                                        <div class="details">${staff}</div>
+                                    
+                                </a>
+                            `;
+                            
+                            
+                            $("#schedule_list").append(tr_str);
+                            
+                        })
+                    }
+                   
+                    
+                    
+                },
+                error: function(resp) {
+                    alert("Opps Try Agian...");
+                }
+            });
+
+
+        });
+
+
+
+
+
+
+
+
+        $(".CreateNoteContainer").hide();
+        $(".CreateNoteBtn").click(function(){
+            $(".CreateNoteContainer").show();
+        });
+
+        $(".CreateNoteClose").click(function(){
+            $(".CreateNoteContainer").hide();
+        });
+
+        $(function () {
+          $('[data-toggle="tooltip"]').tooltip()
+        })
+   
+
+        $("#CreateSchedule").attr("id","CreateSchedule");
+        $("#UpdateSchedule").attr("id","UpdateSchedule");
+         
+         $(document).on("click", ".UpdateClose", function () {
+            var value= $(this).attr('data-item');
+            $("#UpdateSchedule"+value).attr("id","UpdateSchedule");
+             
+         });
+         $(document).on("click", ".CreateClose", function () {
+            var value= $(this).attr('data-item');
+            $("#CreateSchedule"+value).attr("id","CreateSchedule");
+             
+         });
+
+
+         $(document).on("click", ".OpenCreateModal", function () {
+            var value= $(this).attr('data-item');
+            var userId= $(this).attr('ref');
+            var date= $(this).attr('ref1');
+            var ref2= $(this).attr('ref2');
+            // alert(userId);
+            
+            $(".CreateClose").attr("data-item",value);
+            $("#CreateSchedule").attr("id","CreateSchedule"+value);
+            $("#CreateScheduleHeader").html(`Schedule for Sub ${ref2}`);
+            
+            $("#date1").val(date);
+            @if (request()->active == "Customer")
+                $("#customer_id1").val(userId);
+            @else
+                $("#staff_id1").val(userId);
+            @endif
+
+            $("#CreateSchedule"+value).modal('show');
+         });
+
+
+
+
+
+
+
+
+         $(document).on("click", ".filtered", function () {
+            var value= $(this).attr('data-item');
+            var rel= $(this).attr('rel');
+            var ref= $(this).attr('ref');
+            $("#UpdateScheduleHeader").html(`Update Schedule ${ref}`);
+
+            
+            const myArray = rel.split("-|-");
+            
+            $("#customer_id").val(myArray[0]);
+            $("#staff_id").val(myArray[1]);
+            $("#hourly_wags").val(myArray[2]);
+            $("#date").val(myArray[3]);
+            $("#start_time").val(myArray[4]);
+            $("#end_time").val(myArray[5]);
+            $("#status").val(myArray[6]);
+            $("#visibility").val(myArray[7]);
+            
+
+            $("#MyUpdateScheduleForm").attr("action",`{{ url('/schedule/update/') }}/${myArray[8]}`);
+            $("#MyCopyScheduleForm").attr("action",`{{ url('/schedule/copy/') }}/${myArray[8]}`);
+            $("#MyNoteScheduleForm").attr("action",`{{ url('/schedule/note/store/') }}/${myArray[8]}`);
+            $("#DeleteSchedule").attr("href",`{{ url('/schedule/delete/') }}/${myArray[8]}`);
+            // console.log(myArray);
+
+            $(".UpdateClose").attr("data-item",value)
+            $("#UpdateSchedule").attr("id","UpdateSchedule"+value)
+            $("#UpdateSchedule"+value).modal('show');
+         });
+     </script>
+@endsection
